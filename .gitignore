@@ -1,0 +1,35 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Log files
+*.log
+
+# Test binary, build with `go test -c`
+*.test
+*.out
+
+# Mocks
+mock/*
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+cp.xml
+cp.html
+
+# Third party libraries
+vendor/*
+_vendor*
+
+# Build artifacts
+bin/*
+
+# Deploy artifacts
+*.sed.yaml
+
+# VS Code
+.vscode/*
+debug
