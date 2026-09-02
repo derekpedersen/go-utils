@@ -3,21 +3,23 @@ package csv
 import (
 	"encoding/csv"
 	"os"
-
-	"github.com/sirupsen/logrus"
 )
 
-func Read(filepath string, seperator *rune) (records [][]string, err error) {
+func Read(filepath string, separator *rune) (records [][]string, err error) {
 	f, err := os.Open(filepath)
 	if err != nil {
-		logrus.Fatal(err)
+		return nil, err
 	}
 
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
 	csvReader := csv.NewReader(f)
-	if seperator != nil {
-		csvReader.Comma = *seperator
+	if separator != nil {
+		csvReader.Comma = *separator
 	}
 	csvReader.LazyQuotes = true
 	return csvReader.ReadAll()

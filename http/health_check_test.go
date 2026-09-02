@@ -1,199 +1,50 @@
 package http_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
-
 	uh "github.com/derekpedersen/go-utils/http"
-	"github.com/derekpedersen/go-utils/mock"
-
-	"github.com/golang/mock/gomock"
 )
 
-func TestNewHealthAPIController(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	svc := mock.NewMockHealthService(ctrl)
-
-	// Act
-	r := uh.NewHealthAPIController(svc)
-
-	// Assert
-	if r == nil {
-		t.Error("expected controller to be set")
-	}
+type healthService struct {
+	message *uh.HealthMessage
 }
 
-func TestGetAliveMessage(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	svc := mock.NewMockHealthService(ctrl)
-	api := uh.NewHealthAPIController(svc)
+func (service healthService) GetAliveMessage() *uh.HealthMessage   { return service.message }
+func (service healthService) GetReadyMessage() *uh.HealthMessage   { return service.message }
+func (service healthService) GetHealthyMessage() *uh.HealthMessage { return service.message }
 
-	type args struct {
-		method string
-		url    string
-		params map[string]string
-	}
+func TestHealthAPIController(t *testing.T) {
+	api := uh.NewHealthAPIController(healthService{message: &uh.HealthMessage{Message: "Howdy"}})
 	tests := []struct {
-		name       string
-		args       args
-		statuscode int
+		name    string
+		handler http.HandlerFunc
 	}{
-		{
-			name: "GetAliveMessage: 200",
-			args: args{
-				method: http.MethodGet,
-				url:    "/alive",
-			},
-			statuscode: 200,
-		},
+		{name: "alive", handler: api.GetAliveMessage},
+		{name: "ready", handler: api.GetReadyMessage},
+		{name: "healthy", handler: api.GetHealthyMessage},
 	}
 
-	msg := uh.HealthMessage{
-		Message: "Howdy",
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			test.handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
 
-	gomock.InOrder(
-		// GetAliveMessage: 200
-		svc.EXPECT().GetAliveMessage().Return(&msg),
-	)
-
-	// Act
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest(tt.args.method, tt.args.url, nil)
-			if err != nil {
-				t.Fatalf("encountered an unexpected error: %v", err)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("got status %d", recorder.Code)
 			}
-
-			rr := httptest.NewRecorder()
-			req = mux.SetURLVars(req, tt.args.params)
-			handler := http.HandlerFunc(api.GetAliveMessage)
-			handler.ServeHTTP(rr, req)
-
-			// Assert
-			if rr.Code != tt.statuscode {
-				t.Errorf("unexpected status code: have %v, want %v", rr.Code, tt.statuscode)
+			if recorder.Header().Get("Content-Type") != "application/json" {
+				t.Fatalf("got content type %q", recorder.Header().Get("Content-Type"))
 			}
-		})
-	}
-}
-
-func TestGetReadyMessage(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	svc := mock.NewMockHealthService(ctrl)
-	api := uh.NewHealthAPIController(svc)
-
-	type args struct {
-		method string
-		url    string
-		params map[string]string
-	}
-	tests := []struct {
-		name       string
-		args       args
-		statuscode int
-	}{
-		{
-			name: "GetReadyMessage: 200",
-			args: args{
-				method: http.MethodGet,
-				url:    "/ready",
-			},
-			statuscode: 200,
-		},
-	}
-
-	msg := uh.HealthMessage{
-		Message: "Howdy",
-	}
-
-	gomock.InOrder(
-		// GetAliveMessage: 200
-		svc.EXPECT().GetReadyMessage().Return(&msg),
-	)
-
-	// Act
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest(tt.args.method, tt.args.url, nil)
-			if err != nil {
-				t.Fatalf("encountered an unexpected error: %v", err)
+			var message uh.HealthMessage
+			if err := json.Unmarshal(recorder.Body.Bytes(), &message); err != nil {
+				t.Fatal(err)
 			}
-
-			rr := httptest.NewRecorder()
-			req = mux.SetURLVars(req, tt.args.params)
-			handler := http.HandlerFunc(api.GetReadyMessage)
-			handler.ServeHTTP(rr, req)
-
-			// Assert
-			if rr.Code != tt.statuscode {
-				t.Errorf("unexpected status code: have %v, want %v", rr.Code, tt.statuscode)
-			}
-		})
-	}
-}
-
-func TestGetHealthyMessage(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	svc := mock.NewMockHealthService(ctrl)
-	api := uh.NewHealthAPIController(svc)
-
-	type args struct {
-		method string
-		url    string
-		params map[string]string
-	}
-	tests := []struct {
-		name       string
-		args       args
-		statuscode int
-	}{
-		{
-			name: "GetHealthyMessage: 200",
-			args: args{
-				method: http.MethodGet,
-				url:    "/healthy",
-			},
-			statuscode: 200,
-		},
-	}
-
-	msg := uh.HealthMessage{
-		Message: "Howdy",
-	}
-
-	gomock.InOrder(
-		// GetHealthyMessage: 200
-		svc.EXPECT().GetHealthyMessage().Return(&msg),
-	)
-
-	// Act
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest(tt.args.method, tt.args.url, nil)
-			if err != nil {
-				t.Fatalf("encountered an unexpected error: %v", err)
-			}
-
-			rr := httptest.NewRecorder()
-			req = mux.SetURLVars(req, tt.args.params)
-			handler := http.HandlerFunc(api.GetHealthyMessage)
-			handler.ServeHTTP(rr, req)
-
-			// Assert
-			if rr.Code != tt.statuscode {
-				t.Errorf("unexpected status code: have %v, want %v", rr.Code, tt.statuscode)
+			if message.Message != "Howdy" {
+				t.Fatalf("got message %q", message.Message)
 			}
 		})
 	}

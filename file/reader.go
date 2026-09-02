@@ -5,14 +5,12 @@ import (
 	"encoding/csv"
 	"io"
 	"os"
-
-	"github.com/sirupsen/logrus"
 )
 
 func OpenFile(filename string) (*os.File, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		logrus.Fatal(err)
+		return nil, err
 	}
 
 	return f, nil
