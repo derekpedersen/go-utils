@@ -3,12 +3,12 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"math/rand"
-	"strconv"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -21,16 +21,27 @@ func InitDynamoDb() {
 }
 
 func DynamoDbBatchWrite(batch *dynamodb.BatchWriteItemInput, logid uuid.UUID) (*dynamodb.BatchWriteItemOutput, error) {
-	output, err := DYNAMO_DB.BatchWriteItem(batch)
+	if DYNAMO_DB == nil {
+		return nil, os.ErrInvalid
+	}
+	return DynamoDbBatchWriteWithClient(DYNAMO_DB, batch, logid)
+}
+
+func DynamoDbBatchWriteWithClient(client dynamodbiface.DynamoDBAPI, batch *dynamodb.BatchWriteItemInput, logid uuid.UUID) (*dynamodb.BatchWriteItemOutput, error) {
+	if client == nil {
+		return nil, os.ErrInvalid
+	}
+	output, err := client.BatchWriteItem(batch)
 	if err != nil {
 		text, _ := json.Marshal(map[string]interface{}{
 			"Batch":  batch,
 			"Output": output,
 		})
-		err = ioutil.WriteFile(".logs/debug/"+fmt.Sprint(time.Now().Unix())+"_failure_batchwrite"+"_"+strconv.Itoa(rand.Int())+"_"+".json", text, 0644)
-		if err != nil {
-			logrus.Error(err)
+		if mkdirErr := os.MkdirAll(".logs/debug", 0755); mkdirErr != nil {
+			logrus.WithError(mkdirErr).Warn("failed to create DynamoDB debug directory")
+		} else if writeErr := os.WriteFile(filepath.Join(".logs/debug", fmt.Sprint(time.Now().Unix())+"_failure_batchwrite_"+logid.String()+".json"), text, 0644); writeErr != nil {
+			logrus.WithError(writeErr).Warn("failed to write DynamoDB debug file")
 		}
 	}
-	return output, nil
+	return output, err
 }
