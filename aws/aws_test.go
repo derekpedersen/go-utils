@@ -2,6 +2,8 @@ package aws_test
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -44,5 +46,29 @@ func TestDownloadWithClientRejectsNilClient(t *testing.T) {
 	err := utilsaws.DownloadWithClient(filepath.Join(t.TempDir(), "download.txt"), "bucket", nil)
 	if err == nil {
 		t.Fatal("expected nil client error")
+	}
+}
+
+func TestDownloadKeyWithClient(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "nested", "download.txt")
+	err := utilsaws.DownloadKeyWithClient(filename, "remote/key.json", "bucket", fakeS3{body: io.NopCloser(bytes.NewBufferString("payload"))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "payload" {
+		t.Fatalf("got %q", contents)
+	}
+}
+
+func TestDownloadKeyWithContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := utilsaws.DownloadKeyWithContext(ctx, filepath.Join(t.TempDir(), "download.txt"), "remote/key.json", "bucket", fakeS3{body: io.NopCloser(bytes.NewBufferString("payload"))})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v", err)
 	}
 }
