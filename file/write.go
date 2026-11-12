@@ -6,9 +6,24 @@ import (
 	"path/filepath"
 )
 
+func Exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func EnsureDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
 func AtomicWrite(filename string, data []byte, mode os.FileMode) error {
 	directory := filepath.Dir(filename)
-	if err := os.MkdirAll(directory, 0755); err != nil {
+	if err := EnsureDir(directory); err != nil {
 		return err
 	}
 	temporary, err := os.CreateTemp(directory, ".atomic-*")
@@ -50,7 +65,7 @@ func CopyFile(source, destination string, mode os.FileMode) error {
 	}
 	defer input.Close()
 
-	if err := os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
+	if err := EnsureDir(filepath.Dir(destination)); err != nil {
 		return err
 	}
 	output, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)

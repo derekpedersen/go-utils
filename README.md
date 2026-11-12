@@ -1,6 +1,10 @@
 # go-utils
 Small, independent Go utility packages for common application tasks.
 
+Requires Go 1.27 or newer.
+
+The repository intentionally uses AWS SDK v1 for compatibility with the existing package API; a broader v2 migration would be a breaking change and should be handled separately.
+
 ## Packages
 
 - `aws`: AWS session, S3, and DynamoDB helpers.

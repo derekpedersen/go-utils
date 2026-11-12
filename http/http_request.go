@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"io"
 	stdhttp "net/http"
@@ -18,15 +19,34 @@ func (e *ResponseError) Error() string {
 	return fmt.Sprintf("http request failed with status %s", e.Status)
 }
 
+func IsSuccessStatus(statusCode int) bool {
+	return statusCode >= stdhttp.StatusOK && statusCode < stdhttp.StatusMultipleChoices
+}
+
 func HttpRequest(url, method string, headers map[string][]string) (*string, error) {
-	return HttpRequestWithClient(stdhttp.DefaultClient, url, method, headers)
+	return HttpRequestWithClientAndContext(stdhttp.DefaultClient, context.Background(), url, method, headers, nil)
+}
+
+func HttpRequestWithContext(ctx context.Context, url, method string, headers map[string][]string) (*string, error) {
+	return HttpRequestWithClientAndContext(stdhttp.DefaultClient, ctx, url, method, headers, nil)
+}
+
+func HttpRequestWithBody(url, method string, headers map[string][]string, body io.Reader) (*string, error) {
+	return HttpRequestWithClientAndContext(stdhttp.DefaultClient, context.Background(), url, method, headers, body)
 }
 
 func HttpRequestWithClient(client *stdhttp.Client, url, method string, headers map[string][]string) (*string, error) {
+	return HttpRequestWithClientAndContext(client, context.Background(), url, method, headers, nil)
+}
+
+func HttpRequestWithClientAndContext(client *stdhttp.Client, ctx context.Context, url, method string, headers map[string][]string, body io.Reader) (*string, error) {
 	if client == nil {
 		client = stdhttp.DefaultClient
 	}
-	req, err := stdhttp.NewRequest(method, url, nil)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := stdhttp.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		log.Errorf("Error creating request:\n %v", err)
 		return nil, err
@@ -44,13 +64,13 @@ func HttpRequestWithClient(client *stdhttp.Client, url, method string, headers m
 	}
 	defer res.Body.Close()
 	log.WithField("response", res)
-	body, err := io.ReadAll(res.Body)
+	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Errorf("Error reading res.Body:\n %v", err)
 		return nil, err
 	}
-	s := string(body)
-	if res.StatusCode < stdhttp.StatusOK || res.StatusCode >= stdhttp.StatusMultipleChoices {
+	s := string(responseBody)
+	if !IsSuccessStatus(res.StatusCode) {
 		return &s, &ResponseError{StatusCode: res.StatusCode, Status: res.Status, Body: s}
 	}
 	log.WithFields(log.Fields{

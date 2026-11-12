@@ -9,6 +9,11 @@ import (
 )
 
 func UnZipGzCsv(filename string) error {
+	outputfile := strings.TrimSuffix(filename, filepath.Ext(filename)) + ".csv"
+	return UnZipGzCsvTo(filename, outputfile)
+}
+
+func UnZipGzCsvTo(filename, outputfile string) error {
 	gzipFile, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -21,7 +26,9 @@ func UnZipGzCsv(filename string) error {
 	}
 	defer gzipReader.Close()
 
-	outputfile := strings.TrimSuffix(filename, filepath.Ext(filename)) + ".csv"
+	if err := os.MkdirAll(filepath.Dir(outputfile), 0755); err != nil {
+		return err
+	}
 	outfileWriter, err := os.Create(outputfile)
 	if err != nil {
 		return err
